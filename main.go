@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type temperature struct {
@@ -13,6 +14,43 @@ type temperature struct {
 	max float64
 	sum float64
 	num float64
+}
+
+var resultMap = make(map[string]temperature)
+var mu sync.Mutex
+var dataChan = make(chan string, 1000000)
+
+// Worker function to read from the channel and add it to the map
+func worker(dataChan <-chan string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for line := range dataChan {
+		mu.Lock()
+		splitStr := strings.Split(line, ";")
+		station := splitStr[0]
+		reading, _ := strconv.ParseFloat(splitStr[1], 64)
+
+		val, ok := resultMap[station]
+
+		if ok {
+			resultMap[station] = temperature{
+				max: max(val.max, reading),
+				min: min(val.min, reading),
+				num: val.num + 1,
+				sum: reading + val.sum,
+			}
+
+		} else {
+			resultMap[station] = temperature{
+				max: reading,
+				min: reading,
+				num: 1,
+				sum: reading,
+			}
+
+		}
+		mu.Unlock()
+	}
 }
 
 func writeToFile(str string) {
@@ -32,48 +70,40 @@ func writeToFile(str string) {
 	fmt.Println("Wrote to file 'output.txt'.")
 }
 
-func getTemperatureReading(fileLocation string) map[string]temperature {
-	measurementMap := make(map[string]temperature)
+func setTemperatureReading(fileLocation string) error {
 
 	file, err := os.Open(fileLocation)
+
 	if err != nil {
 		fmt.Println(err)
-		return measurementMap
+		return err
 	}
 	defer file.Close()
 
+	// WaitGroup for processing lines
+	var wg sync.WaitGroup
+
 	scanner := bufio.NewScanner(file)
+
+	// Start workers to consume data from channel and add to the map
+	numWorkers := 4
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker(dataChan, &wg)
+	}
 
 	// Read the file line by line
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		splitStr := strings.Split(line, ";")
-		station := splitStr[0]
-		reading, _ := strconv.ParseFloat(splitStr[1], 64)
-
-		val, ok := measurementMap[station]
-
-		if ok {
-			measurementMap[station] = temperature{
-				max: max(val.max, reading),
-				min: min(val.min, reading),
-				num: val.num + 1,
-				sum: reading + val.sum,
-			}
-
-		} else {
-			measurementMap[station] = temperature{
-				max: reading,
-				min: reading,
-				num: 1,
-				sum: reading,
-			}
-
-		}
+		dataChan <- line
 	}
 
-	return measurementMap
+	close(dataChan)
+
+	// Wait for all workers to finish processing the data from the channel
+	wg.Wait()
+
+	return nil
 }
 
 func formatOutput(measurementMap map[string]temperature) string {
@@ -99,7 +129,7 @@ func formatOutput(measurementMap map[string]temperature) string {
 }
 
 func main() {
-	measurementMap := getTemperatureReading("measurements-short.txt")
-	output := formatOutput(measurementMap)
+	setTemperatureReading("measurements.txt")
+	output := formatOutput(resultMap)
 	writeToFile(output)
 }
