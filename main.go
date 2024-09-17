@@ -16,40 +16,40 @@ type temperature struct {
 	num float64
 }
 
-var resultMap = make(map[string]temperature)
-var mu sync.Mutex
-var dataChan = make(chan string, 1000000)
+var resultMap sync.Map
+
+var dataChan = make(chan string, 10000)
 
 // Worker function to read from the channel and add it to the map
 func worker(dataChan <-chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for line := range dataChan {
-		mu.Lock()
 		splitStr := strings.Split(line, ";")
 		station := splitStr[0]
 		reading, _ := strconv.ParseFloat(splitStr[1], 64)
 
-		val, ok := resultMap[station]
-
-		if ok {
-			resultMap[station] = temperature{
-				max: max(val.max, reading),
-				min: min(val.min, reading),
-				num: val.num + 1,
-				sum: reading + val.sum,
+		// Load the current value from the map
+		if val, ok := resultMap.Load(station); ok {
+			// If the station exists, update its temperature record
+			temp := val.(temperature)
+			updatedTemp := temperature{
+				max: max(temp.max, reading),
+				min: min(temp.min, reading),
+				num: temp.num + 1,
+				sum: temp.sum + reading,
 			}
-
+			resultMap.Store(station, updatedTemp)
 		} else {
-			resultMap[station] = temperature{
+			// If the station does not exist, create a new temperature record
+			newTemp := temperature{
 				max: reading,
 				min: reading,
 				num: 1,
 				sum: reading,
 			}
-
+			resultMap.Store(station, newTemp)
 		}
-		mu.Unlock()
 	}
 }
 
@@ -106,30 +106,27 @@ func setTemperatureReading(fileLocation string) error {
 	return nil
 }
 
-func formatOutput(measurementMap map[string]temperature) string {
+func formatOutput() string {
 	out := "{"
-	total := len(measurementMap)
-	count := 0
-	for key, value := range measurementMap {
-		// min, mean, max in this order
-		formattedMin := fmt.Sprintf("%.1f", value.min)
-		formattedMean := fmt.Sprintf("%.1f", value.sum/value.num)
-		formattedMax := fmt.Sprintf("%.1f", value.max)
 
-		out += key + "=" + formattedMin + "/" + formattedMean + "/" + formattedMax
-		count++
+	// sync.Map does not have len... so use Range
+	resultMap.Range(func(key, value interface{}) bool {
+		k := key.(string)
+		v := value.(temperature)
 
-		if count != total {
-			out += ", "
-		} else {
-			out += "}"
-		}
-	}
-	return out
+		// Format min, mean, and max values
+		formattedMin := fmt.Sprintf("%.1f", float64(v.min))
+		formattedMean := fmt.Sprintf("%.1f", float64(v.sum)/float64(v.num))
+		formattedMax := fmt.Sprintf("%.1f", float64(v.max))
+		out += k + "=" + formattedMin + "/" + formattedMean + "/" + formattedMax + ", "
+		return true
+	})
+
+	return out[:len(out)-2] + "}"
 }
 
 func main() {
 	setTemperatureReading("measurements.txt")
-	output := formatOutput(resultMap)
+	output := formatOutput()
 	writeToFile(output)
 }
