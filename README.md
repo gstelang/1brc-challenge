@@ -33,3 +33,10 @@ time go run main.go
 Wrote to file 'output.txt'.
 go run main.go  519.42s user 9.86s system 710% cpu 1:14.54 total
 ```
+
+# Solution 6: (TODO) Read file in chunks
+
+
+# Other solutions to explore:
+1. Custom hashtables.
+2. mmaps
