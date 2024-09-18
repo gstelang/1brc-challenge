@@ -26,3 +26,10 @@ time go run main.go
 Wrote to file 'output.txt'.
 go run main.go  582.49s user 201.67s system 320% cpu 4:04.51 total
 ```
+
+# Solution 5: Batch processing with goroutine for each. Batch size: 1 million
+```
+time go run main.go 
+Wrote to file 'output.txt'.
+go run main.go  519.42s user 9.86s system 710% cpu 1:14.54 total
+```
