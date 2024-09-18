@@ -27,9 +27,13 @@ func processBatch(batch []string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for _, line := range batch {
-		splitStr := strings.Split(line, ";")
-		station := splitStr[0]
-		reading, _ := strconv.ParseFloat(splitStr[1], 64)
+		delimiterIndex := strings.Index(line, ";")
+		if delimiterIndex == -1 {
+			// skip line
+			continue
+		}
+		station := line[:delimiterIndex]
+		reading, _ := strconv.ParseFloat(line[delimiterIndex+1:], 64)
 
 		// Load the current value from the map
 		if val, ok := resultMap.Load(station); ok {

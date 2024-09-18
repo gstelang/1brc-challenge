@@ -34,6 +34,14 @@ Wrote to file 'output.txt'.
 go run main.go  519.42s user 9.86s system 710% cpu 1:14.54 total
 ```
 
+# Soluton 5.1: Batch processing but avoiding strings.split and using index.
+
+```
+time go run main.go 
+Wrote to file 'output.txt'.
+go run main.go  391.00s user 7.98s system 634% cpu 1:02.90 total
+```
+
 # Solution 6: (TODO) Read file in chunks
 
 
