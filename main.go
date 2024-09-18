@@ -16,15 +16,15 @@ type temperature struct {
 	num float64
 }
 
+const batchSize = 1000000
+
 var resultMap sync.Map
 
-var dataChan = make(chan string, 10000)
-
-// Worker function to read from the channel and add it to the map
-func worker(dataChan <-chan string, wg *sync.WaitGroup) {
+// Worker function to process a batch of data
+func processBatch(batch []string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for line := range dataChan {
+	for _, line := range batch {
 		splitStr := strings.Split(line, ";")
 		station := splitStr[0]
 		reading, _ := strconv.ParseFloat(splitStr[1], 64)
@@ -71,39 +71,40 @@ func writeToFile(str string) {
 }
 
 func setTemperatureReading(fileLocation string) error {
-
 	file, err := os.Open(fileLocation)
-
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
 	defer file.Close()
 
-	// WaitGroup for processing lines
 	var wg sync.WaitGroup
-
 	scanner := bufio.NewScanner(file)
 
-	// Start workers to consume data from channel and add to the map
-	numWorkers := 4
-	for i := 0; i < numWorkers; i++ {
-		wg.Add(1)
-		go worker(dataChan, &wg)
-	}
+	batch := make([]string, 0, batchSize)
 
-	// Read the file line by line
 	for scanner.Scan() {
-		line := scanner.Text()
-		dataChan <- line
+		batch = append(batch, scanner.Text())
+
+		if len(batch) == batchSize {
+			wg.Add(1)
+			// Make a copy of the batch.
+			// if we pass batch, it can result into data race where we're processing for next batch while goroutine is modifying the previous batch.
+			go processBatch(append([]string(nil), batch...), &wg)
+			batch = batch[:0] // Clear the batch
+		}
 	}
 
-	close(dataChan)
+	// Process any remaining lines
+	if len(batch) > 0 {
+		wg.Add(1)
+		go processBatch(append([]string(nil), batch...), &wg)
+	}
 
-	// Wait for all workers to finish processing the data from the channel
+	// Wait for all batches to be processed
 	wg.Wait()
 
-	return nil
+	return scanner.Err()
 }
 
 func formatOutput() string {
@@ -126,7 +127,11 @@ func formatOutput() string {
 }
 
 func main() {
-	setTemperatureReading("measurements.txt")
+	err := setTemperatureReading("measurements.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
 	output := formatOutput()
 	writeToFile(output)
 }
