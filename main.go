@@ -16,6 +16,8 @@ type temperature struct {
 	num float64
 }
 
+// Small enough to avoid exhausting memory, but
+// large enough to minimize overhead from creating and managing goroutines.
 const batchSize = 1000000
 
 var resultMap sync.Map
