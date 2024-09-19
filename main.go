@@ -18,15 +18,16 @@ type temperature struct {
 
 // Small enough to avoid exhausting memory, but
 // large enough to minimize overhead from creating and managing goroutines.
-const batchSize = 1000000
+// 1 million rows
+const batchSize = 1000 * 1000
 
 var resultMap sync.Map
 
-// Worker function to process a batch of data
-func processBatch(batch []string, wg *sync.WaitGroup) {
-	defer wg.Done()
+// Create a buffered channel with a capacity of batchSize
+var dataChan = make(chan []string, batchSize)
 
-	for _, line := range batch {
+func processBatch() {
+	for _, line := range <-dataChan {
 		delimiterIndex := strings.Index(line, ";")
 		if delimiterIndex == -1 {
 			// skip line
@@ -84,11 +85,11 @@ func setTemperatureReading(fileLocation string) error {
 	}
 	defer file.Close()
 
-	var wg sync.WaitGroup
 	batch := make([]string, 0, batchSize)
 	chunkSize := 4096 * 1000 // 4 MB chunks
 	buffer := make([]byte, chunkSize)
 	lastLineRead := ""
+	go processBatch()
 
 	for {
 		bytesRead, err := file.Read(buffer)
@@ -105,11 +106,9 @@ func setTemperatureReading(fileLocation string) error {
 		batch = append(batch, ans[:len(ans)-1]...)
 
 		if len(batch) >= batchSize {
-			wg.Add(1)
-			// Make a copy of the batch.
-			// if we pass batch, it can result into data race where we're processing for next batch while goroutine is modifying the previous batch.
-			go processBatch(append([]string(nil), batch...), &wg)
-			batch = batch[:0] // Clear the batch
+			dataChan <- batch
+			// Clear the batch
+			batch = batch[:0]
 		}
 
 		lastLineRead = ans[len(ans)-1]
@@ -121,13 +120,10 @@ func setTemperatureReading(fileLocation string) error {
 
 	// Process any remaining lines
 	if len(batch) > 0 {
-		wg.Add(1)
-		go processBatch(append([]string(nil), batch...), &wg)
+		dataChan <- batch
 	}
 
-	// Wait for all batches to be processed
-	wg.Wait()
-
+	close(dataChan)
 	return nil
 }
 

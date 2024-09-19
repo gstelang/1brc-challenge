@@ -1,5 +1,6 @@
 # 1brc-challenge
 * Documenting my experience and trying few things along the way....
+* All tests on apple macbook M1 pro (2020) with 16 GB RAM.
 
 # Solution 1:  Simple map with bufio.NewScanner. 
 ```
@@ -47,6 +48,14 @@ go run main.go  391.00s user 7.98s system 634% cpu 1:02.90 total
 time go run main.go
 Wrote to file 'output.txt'.
 go run main.go  404.83s user 9.70s system 688% cpu 1:00.22 total
+```
+
+# Solution 7: (Baseline) Read file in 4 MB chunks and process data in using a buffered channel!
+* Less system overload and ~20 sec.
+```
+time go run main.go
+Wrote to file 'output.txt'.
+go run main.go  24.74s user 2.54s system 132% cpu 20.567 total
 ```
 
 # Other solutions to explore:
