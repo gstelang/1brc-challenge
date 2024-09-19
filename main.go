@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -85,20 +85,38 @@ func setTemperatureReading(fileLocation string) error {
 	defer file.Close()
 
 	var wg sync.WaitGroup
-	scanner := bufio.NewScanner(file)
-
 	batch := make([]string, 0, batchSize)
+	chunkSize := 4096 * 1000 // 4 MB chunks
+	buffer := make([]byte, chunkSize)
+	lastLineRead := ""
 
-	for scanner.Scan() {
-		batch = append(batch, scanner.Text())
+	for {
+		bytesRead, err := file.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println("Error reading file:", err)
+			}
+			break
+		}
 
-		if len(batch) == batchSize {
+		// bytes read will be either size of chunk defined or less or less.
+		str := string(buffer[:bytesRead])
+		ans := strings.Split(lastLineRead+str, "\n")
+		batch = append(batch, ans[:len(ans)-1]...)
+
+		if len(batch) >= batchSize {
 			wg.Add(1)
 			// Make a copy of the batch.
 			// if we pass batch, it can result into data race where we're processing for next batch while goroutine is modifying the previous batch.
 			go processBatch(append([]string(nil), batch...), &wg)
 			batch = batch[:0] // Clear the batch
 		}
+
+		lastLineRead = ans[len(ans)-1]
+	}
+
+	if lastLineRead != "" {
+		batch = append(batch, lastLineRead)
 	}
 
 	// Process any remaining lines
@@ -110,7 +128,7 @@ func setTemperatureReading(fileLocation string) error {
 	// Wait for all batches to be processed
 	wg.Wait()
 
-	return scanner.Err()
+	return nil
 }
 
 func formatOutput() string {
