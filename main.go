@@ -20,11 +20,14 @@ type temperature struct {
 // large enough to minimize overhead from creating and managing goroutines.
 // 1 million rows
 const batchSize = 1000 * 1000
+const chunkSize = 4096 * 1000 // 4 MB chunks
+const chanSize = 1000         // 1000 * 1 million = 1 billion
 
+// Stores the final result
 var resultMap sync.Map
 
 // Create a buffered channel with a capacity of batchSize
-var dataChan = make(chan []string, batchSize)
+var dataChan = make(chan []string, chanSize)
 
 func processBatch() {
 	for _, line := range <-dataChan {
@@ -86,7 +89,6 @@ func setTemperatureReading(fileLocation string) error {
 	defer file.Close()
 
 	batch := make([]string, 0, batchSize)
-	chunkSize := 4096 * 1000 // 4 MB chunks
 	buffer := make([]byte, chunkSize)
 	lastLineRead := ""
 	go processBatch()
