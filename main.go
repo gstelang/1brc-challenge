@@ -29,7 +29,8 @@ var resultMap sync.Map
 // Create a buffered channel with a capacity of batchSize
 var dataChan = make(chan []string, chanSize)
 
-func processBatch() {
+func processBatch(wg *sync.WaitGroup) {
+	defer wg.Done()
 	for _, line := range <-dataChan {
 		delimiterIndex := strings.Index(line, ";")
 		if delimiterIndex == -1 {
@@ -91,7 +92,9 @@ func setTemperatureReading(fileLocation string) error {
 	batch := make([]string, 0, batchSize)
 	buffer := make([]byte, chunkSize)
 	lastLineRead := ""
-	go processBatch()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go processBatch(&wg)
 
 	for {
 		bytesRead, err := file.Read(buffer)
@@ -108,9 +111,19 @@ func setTemperatureReading(fileLocation string) error {
 		batch = append(batch, ans[:len(ans)-1]...)
 
 		if len(batch) >= batchSize {
-			dataChan <- batch
-			// Clear the batch
-			batch = batch[:0]
+			// Send batch to the channel
+			select {
+			case dataChan <- batch:
+				// Successfully sent the batch, clear the batch
+				batch = batch[:0]
+			default:
+
+				wg.Add(1)
+				go processBatch(&wg)
+
+				dataChan <- batch
+				batch = batch[:0]
+			}
 		}
 
 		lastLineRead = ans[len(ans)-1]
@@ -122,10 +135,13 @@ func setTemperatureReading(fileLocation string) error {
 
 	// Process any remaining lines
 	if len(batch) > 0 {
+		wg.Add(1)
+		go processBatch(&wg)
 		dataChan <- batch
 	}
 
 	close(dataChan)
+	wg.Wait()
 	return nil
 }
 

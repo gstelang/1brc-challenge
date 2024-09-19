@@ -58,6 +58,22 @@ go run main.go  404.83s user 9.70s system 688% cpu 1:00.22 total
     3. Processes the batch of 1 million rows.
     4. Stores the result in a concurrent-safe sync.Map.
 ```
++------------------+     +------------------+     +------------------+
+|   4 MB Chunk     | --> |   8 MB Chunk     | --> |  12 MB Chunk     | 
++------------------+     +------------------+     +------------------+
+        |                        |                        |
+        v                        v                        v
++--------------------------------------------------------------+
+|                      Line Array (up to 1 million rows)       |
++--------------------------------------------------------------+
+        |
+        v
++--------------------------------------------------------------+
+| Channel of 1 million rows processed into sync.Map            |
++--------------------------------------------------------------+
+```
+
+```
 time go run main.go
 Wrote to file 'output.txt'.
 go run main.go  24.74s user 2.54s system 132% cpu 20.567 total
