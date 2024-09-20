@@ -81,5 +81,5 @@ go run main.go  24.74s user 2.54s system 132% cpu 20.567 total
 ```
 
 # Other solutions to explore:
-1. Custom hashtables.
-2. mmaps
+1. Possible get rid of sync.Map. Custom hashtables?
+2. mmaps (memory mapped files with partial memory mapping based on page size)
