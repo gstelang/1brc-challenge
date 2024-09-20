@@ -80,6 +80,14 @@ Wrote to file 'output.txt'.
 go run main.go  24.74s user 2.54s system 132% cpu 20.567 total
 ```
 
+# Solution 8: Removed sync.Map. Make 2 channels. Multiple go routines writing to data channel (Fan out) and aggregating into result channel (map of station to temperature)
+* TODO: possibly a bug in the calculation somewhere although the keys match.
+```
+time go run main.go
+Wrote to file 'output.txt'.
+go run main.go  25.59s user 2.72s system 133% cpu 21.242 total
+```
+
 # Other solutions to explore:
-1. Possible get rid of sync.Map. Custom hashtables?
+1. Custom hashtables?
 2. mmaps (memory mapped files with partial memory mapping based on page size)
