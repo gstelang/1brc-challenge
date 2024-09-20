@@ -29,38 +29,42 @@ var resultMap sync.Map
 // Create a buffered channel with a capacity of batchSize
 var dataChan = make(chan []string, chanSize)
 
+func processLine(line string) {
+	delimiterIndex := strings.Index(line, ";")
+	if delimiterIndex == -1 {
+		// skip line
+		return
+	}
+	station := line[:delimiterIndex]
+	reading, _ := strconv.ParseFloat(line[delimiterIndex+1:], 64)
+
+	// Load the current value from the map
+	if val, ok := resultMap.Load(station); ok {
+		// If the station exists, update its temperature record
+		temp := val.(temperature)
+		updatedTemp := temperature{
+			max: max(temp.max, reading),
+			min: min(temp.min, reading),
+			num: temp.num + 1,
+			sum: temp.sum + reading,
+		}
+		resultMap.Store(station, updatedTemp)
+	} else {
+		// If the station does not exist, create a new temperature record
+		newTemp := temperature{
+			max: reading,
+			min: reading,
+			num: 1,
+			sum: reading,
+		}
+		resultMap.Store(station, newTemp)
+	}
+}
+
 func processBatch(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for _, line := range <-dataChan {
-		delimiterIndex := strings.Index(line, ";")
-		if delimiterIndex == -1 {
-			// skip line
-			continue
-		}
-		station := line[:delimiterIndex]
-		reading, _ := strconv.ParseFloat(line[delimiterIndex+1:], 64)
-
-		// Load the current value from the map
-		if val, ok := resultMap.Load(station); ok {
-			// If the station exists, update its temperature record
-			temp := val.(temperature)
-			updatedTemp := temperature{
-				max: max(temp.max, reading),
-				min: min(temp.min, reading),
-				num: temp.num + 1,
-				sum: temp.sum + reading,
-			}
-			resultMap.Store(station, updatedTemp)
-		} else {
-			// If the station does not exist, create a new temperature record
-			newTemp := temperature{
-				max: reading,
-				min: reading,
-				num: 1,
-				sum: reading,
-			}
-			resultMap.Store(station, newTemp)
-		}
+		processLine(line)
 	}
 }
 
@@ -117,10 +121,8 @@ func setTemperatureReading(fileLocation string) error {
 				// Successfully sent the batch, clear the batch
 				batch = batch[:0]
 			default:
-
 				wg.Add(1)
 				go processBatch(&wg)
-
 				dataChan <- batch
 				batch = batch[:0]
 			}

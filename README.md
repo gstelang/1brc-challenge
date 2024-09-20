@@ -52,6 +52,7 @@ go run main.go  404.83s user 9.70s system 688% cpu 1:00.22 total
 
 # Solution 7: (Baseline) Read file in 4 MB chunks and process data in using a buffered channel!
 * Less system overload and ~20 sec.
+* As a note, this solution works with buffered channel size of 1000. Otherwise, perf is ~50 sec.
 * Steps (Step 1 and 3 are concurrent)
     1. Read data in 4 MB increments.
     2. Accumulates 1 million rows.
