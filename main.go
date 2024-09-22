@@ -1,23 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 )
 
 type temperature struct {
-	min float64
-	max float64
-	sum float64
-	num float64
+	min, max, sum float64
+	num           int
 }
 
 type temperatureReading struct {
-	station string
+	station []byte
 	value   float64
 }
 
@@ -28,7 +26,7 @@ const batchSize = 1000 * 1000
 const chunkSize = 4096 * 1000 // 4 MB chunks
 const chanSize = 1000         // 1000 * 1 million = 1 billion
 
-var dataChan = make(chan []string, chanSize)
+var dataChan = make(chan [][]byte, chanSize)
 var readingsChan = make(chan temperatureReading, batchSize)
 
 var resultMap = make(map[string]temperature)
@@ -38,7 +36,7 @@ func aggregateTemperatures(aggWg *sync.WaitGroup) {
 
 	for reading := range readingsChan {
 		currentVal := reading.value
-		currentStation := reading.station
+		currentStation := string(reading.station)
 		temp, exists := resultMap[currentStation]
 		if !exists {
 			resultMap[currentStation] = temperature{
@@ -59,10 +57,19 @@ func aggregateTemperatures(aggWg *sync.WaitGroup) {
 
 }
 
-func processLine(line string) {
-	splitStr := strings.Split(line, ";")
-	station := splitStr[0]
-	reading, _ := strconv.ParseFloat(splitStr[1], 64)
+func processLine(line []byte) {
+	if len(line) == 0 {
+		return
+	}
+	splitIndex := bytes.IndexByte(line, ';')
+	if splitIndex == -1 {
+		return
+	}
+	station := line[:splitIndex]
+	reading, err := strconv.ParseFloat(string(line[splitIndex+1:]), 64)
+	if err != nil {
+		return
+	}
 	readingsChan <- temperatureReading{
 		station: station,
 		value:   reading,
@@ -101,9 +108,9 @@ func setTemperatureReading(fileLocation string) error {
 	}
 	defer file.Close()
 
-	batch := make([]string, 0, batchSize)
+	batch := make([][]byte, 0, batchSize)
 	buffer := make([]byte, chunkSize)
-	lastLineRead := ""
+	lastLineRead := make([]byte, 0)
 
 	var aggWg sync.WaitGroup
 	aggWg.Add(1)
@@ -123,8 +130,8 @@ func setTemperatureReading(fileLocation string) error {
 		}
 
 		// bytes read will be either size of chunk defined or less or less.
-		str := string(buffer[:bytesRead])
-		ans := strings.Split(lastLineRead+str, "\n")
+		data := buffer[:bytesRead]
+		ans := bytes.Split(append(lastLineRead, data...), []byte("\n"))
 		batch = append(batch, ans[:len(ans)-1]...)
 
 		if len(batch) >= batchSize {
@@ -144,7 +151,7 @@ func setTemperatureReading(fileLocation string) error {
 		lastLineRead = ans[len(ans)-1]
 	}
 
-	if lastLineRead != "" {
+	if len(lastLineRead) != 0 {
 		batch = append(batch, lastLineRead)
 	}
 
@@ -169,7 +176,7 @@ func formatOutput() string {
 	for key, value := range resultMap {
 		// min, mean, max in this order
 		formattedMin := fmt.Sprintf("%.1f", value.min)
-		formattedMean := fmt.Sprintf("%.1f", value.sum/value.num)
+		formattedMean := fmt.Sprintf("%.1f", value.sum/float64(value.num))
 		formattedMax := fmt.Sprintf("%.1f", value.max)
 
 		out += key + "=" + formattedMin + "/" + formattedMean + "/" + formattedMax
