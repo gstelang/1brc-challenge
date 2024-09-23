@@ -1,5 +1,5 @@
 # Goal 
-* Process 1 billion rows in a file of size 12.85 GB in Go with high perf! Original Repo (here)[https://github.com/AlexanderYastrebov/1brc Process 1 billion]
+* Process 1 billion rows in a file of size 12.85 GB in Go with high perf! Original Repo [here](https://github.com/AlexanderYastrebov/1brc)
 * Documenting my experience and trying few things along the way....
 * All tests on apple macbook M1 pro (2020) with 16 GB RAM.
 
