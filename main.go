@@ -19,6 +19,8 @@ type temperature struct {
 // 1 million rows
 const batchSize = 1000 * 1000
 const chunkSize = 4096 * 1000 // 4 MB chunks
+// Too large => more memory
+// Too small => slow perf
 const chanSize = 1000         // 1000 * 1 million = 1 billion
 
 var dataChan = make(chan [][]byte, chanSize)
