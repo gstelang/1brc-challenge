@@ -1,4 +1,5 @@
-# 1brc-challenge
+# Goal 
+* Process 1 billion rows in a file of size 12.85 GB in Go with high perf! Original challenge with Java submission [here](https://github.com/AlexanderYastrebov/1brc)
 * Documenting my experience and trying few things along the way....
 * All tests on apple macbook M1 pro (2020) with 16 GB RAM.
 
@@ -102,13 +103,7 @@ Wrote to file 'output.txt'.
 go run main.go  24.74s user 2.54s system 132% cpu 20.567 total
 ```
 
-# Solution 8: Removed sync.Map. Make 2 channels. Multiple go routines writing to data channel (Fan out) and aggregating into result channel (map of station to temperature)
-* TODO: possibly a bug in the calculation somewhere although the keys match.
-```
-time go run main.go
-Wrote to file 'output.txt'.
-go run main.go  25.59s user 2.72s system 133% cpu 21.242 total
-```
+~~# Solution 8: Removed sync.Map. Make 2 channels. Multiple go routines writing to data channel (Fan out) and aggregating into result channel (map of station to temperature)~~
 
 # Other solutions to explore:
 1. Custom hashtables?
