@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 )
@@ -165,10 +168,37 @@ func formatOutput() string {
 }
 
 func main() {
-	err := setTemperatureReading("measurements.txt")
+	// CPU profiling
+	cpuFile, err := os.Create("cpu_profile.prof")
 	if err != nil {
+		log.Fatal(err)
+	}
+	defer cpuFile.Close()
+
+	if err := pprof.StartCPUProfile(cpuFile); err != nil {
+		log.Fatal(err)
+	}
+	defer pprof.StopCPUProfile()
+
+	// Memory profiling
+	memFile, err := os.Create("mem_profile.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer memFile.Close()
+
+	tempErr := setTemperatureReading("measurements.txt")
+	if tempErr != nil {
 		fmt.Println("Error reading file:", err)
 		return
 	}
 	writeToFile(formatOutput())
+
+	// Write memory profile
+	runtime.GC() // Run a garbage collection to get up-to-date statistics
+	if err := pprof.WriteHeapProfile(memFile); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Profiling complete. CPU profile saved to cpu_profile.prof and memory profile saved to mem_profile.prof")
 }
